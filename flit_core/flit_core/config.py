@@ -5,7 +5,12 @@ import logging
 import os
 import os.path as osp
 from pathlib import Path
+from contextlib import suppress
 import re
+from dataclasses import dataclass
+from typing import Any
+
+import hashlib
 
 try:
     import tomllib
@@ -22,6 +27,9 @@ from .common import normalise_core_metadata_name
 from .versionno import normalise_version
 
 log = logging.getLogger(__name__)
+
+
+VARIANT_HASH_LEN = 8
 
 
 class ConfigError(ValueError):
@@ -78,11 +86,11 @@ default_license_files_globs = ['COPYING*', 'LICEN[CS]E*']
 license_files_allowed_chars = re.compile(r'^[\w\-\.\/\*\?\[\]]+$')
 
 
-def read_flit_config(path):
+def read_flit_config(path, vprops: list[str] | None = None):
     """Read and check the `pyproject.toml` file with data about the package.
     """
     d = tomllib.loads(path.read_text('utf-8'))
-    return prep_toml_config(d, path)
+    return prep_toml_config(d, path, vprops=vprops)
 
 
 class EntryPointsConflict(ConfigError):
@@ -90,12 +98,13 @@ class EntryPointsConflict(ConfigError):
         return ('Please specify console_scripts entry points, or [scripts] in '
             'flit config, not both.')
 
-def prep_toml_config(d, path):
+def prep_toml_config(d, path, vprops: list[str] | None = None):
     """Validate config loaded from pyproject.toml and prepare common metadata
 
     Returns a LoadedConfig object.
     """
     dtool = d.get('tool', {}).get('flit', {})
+    dvariant = d.get('variant-providers', {})
 
     if 'project' in d:
         # Metadata in [project] table (PEP 621)
@@ -133,6 +142,10 @@ def prep_toml_config(d, path):
         raise ConfigError(
             "Neither [project] nor [tool.flit.metadata] found in pyproject.toml"
         )
+    
+    if dvariant:
+        loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops)
+        loaded_cfg.variant_config.validate()
 
     unknown_sections = set(dtool) - {
         'metadata', 'module', 'scripts', 'entrypoints', 'sdist', 'external-data'
@@ -262,6 +275,7 @@ class LoadedConfig:
         self.sdist_exclude_patterns = []
         self.dynamic_metadata = []
         self.data_directory = None
+        self.variant_config: VariantConfig | None = None
 
     def add_scripts(self, scripts_dict):
         if scripts_dict:
@@ -269,6 +283,104 @@ class LoadedConfig:
                 raise EntryPointsConflict
             else:
                 self.entrypoints['console_scripts'] = scripts_dict
+
+@dataclass
+class VariantProviderConfig:
+    requires: list[str]
+    entry_point: str
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Creates an instance of VariantProviderConfig from a dictionary."""
+        # Convert hyphenated keys to underscored keys
+        data = {key.replace("-", "_"): value for key, value in data.items()}
+
+        # Create an instance of VariantProviderConfig
+        return cls(**data)
+
+    def validate(self):
+        """Validates the VariantProviderConfig instance."""
+        if not self.requires:
+            raise ValueError("Requires list cannot be empty")
+        if not self.entry_point:
+            raise ValueError("Entry-Point cannot be empty")
+
+
+@dataclass
+class VariantConfig:
+    vhash: str
+    properties: list[str]
+    default_priorities: dict[str, list[str]]
+    providers: dict[str, VariantProviderConfig]
+
+    @classmethod
+    def from_dict(cls, data: dict, vprops: list[str] | None = None):
+        """Creates an instance of VariantConfig from a dictionary."""
+        data = data.copy()
+
+        if vprops is None or not vprops:
+            data["vhash"] = "0" * VARIANT_HASH_LEN
+            data["properties"] = []
+
+        else:
+            # Normalizing
+            _vprops = [
+                [el.strip() for el in vprop.split("::")]
+                for vprop in vprops
+            ]
+            for vprop in _vprops:
+                assert len(vprop) == 3, f"Invalid variant property: {vprop}"
+
+            data["properties"] = [" :: ".join(vprop) for vprop in _vprops]
+            hash_object = hashlib.sha256()
+            for vprop in data["properties"]:
+                hash_object.update(f"{vprop}\n".encode())
+            data["vhash"] = hash_object.hexdigest()[:VARIANT_HASH_LEN]
+
+        # Convert hyphenated keys to underscored keys
+        data = {key.replace("-", "_"): value for key, value in data.items()}
+
+        # Convert providers to VariantProviderConfig instances
+        data["providers"] = {
+            provider: VariantProviderConfig.from_dict(provider_data)
+            for provider, provider_data in data["providers"].items()
+        }
+
+        # Create an instance of VariantConfig
+        return cls(**data)
+
+    def validate(self):
+        """Validates the VariantConfig instance."""
+        for namespace in self.default_priorities["namespace"]:
+            if namespace not in self.providers:
+                raise ValueError(
+                    f"Namespace '{namespace}' is not defined in the variant providers"
+                )
+
+        for provider_cfg in self.providers.values():
+            provider_cfg.validate()
+
+    def to_metadata_dict(self) -> dict[str, Any]:
+        """Converts the VariantConfig instance to a metadata dictionary."""
+        return {
+            "variant_hash": self.vhash,
+            "variant_properties": self.properties,
+            "variant_requires": [
+                f"{namespace}: {preq}"
+                for namespace, provider_cfg in self.providers.items()
+                for preq in provider_cfg.requires
+            ],
+            "variant_entry_points": [
+                f"{namespace}: {provider_cfg.entry_point}"
+                for namespace, provider_cfg in self.providers.items()
+            ],
+            "variant_default_namespace_priorities": self.default_priorities[
+                "namespace"
+            ],
+            "variant_default_feature_priorities": self.default_priorities["feature"],
+            "variant_default_property_priorities": self.default_priorities["property"],
+        }
+
 
 readme_ext_to_content_type = {
     '.rst': 'text/x-rst',

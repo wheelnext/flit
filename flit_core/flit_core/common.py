@@ -351,6 +351,14 @@ class Metadata:
     license_files = ()
     dynamic = ()
 
+    variant_hash = None
+    variant_properties = ()
+    variant_requires = ()
+    variant_entry_points = ()
+    variant_default_namespace_priorities = ()
+    variant_default_feature_priorities = ()
+    variant_default_property_priorities = ()
+
     metadata_version = "2.4"
 
     def __init__(self, data):
@@ -444,6 +452,27 @@ class Metadata:
         if self.description is not None:
             fp.write('\n' + self.description + '\n')
 
+        if self.variant_hash is not None:
+            fp.write('Variant-hash: {}\n'.format(self.variant_hash))
+            for vprop in self.variant_properties:
+                fp.write('Variant-property: {}\n'.format(vprop))
+            for vreq in self.variant_requires:
+                fp.write('Variant-requires: {}\n'.format(vreq))
+            for vEP in self.variant_entry_points:
+                fp.write('Variant-entry-point: {}\n'.format(vEP))
+            if self.variant_default_namespace_priorities:
+                fp.write('Variant-default-namespace-priorities: {}\n'.format(
+                    ', '.join(self.variant_default_namespace_priorities)
+                ))
+            if self.variant_default_feature_priorities:
+                fp.write('Variant-default-feature-priorities: {}\n'.format(
+                    ', '.join(self.variant_default_feature_priorities)
+                ))
+            if self.variant_default_property_priorities:
+                fp.write('Variant-default-property-priorities: {}\n'.format(
+                    ', '.join(self.variant_default_property_priorities)
+                ))
+
     @property
     def supports_py2(self):
         """Return True if Requires-Python indicates Python 2 support."""
@@ -457,6 +486,9 @@ def make_metadata(module, ini_info):
     md_dict = {'name': module.name, 'provides': [module.name]}
     md_dict.update(get_info_from_module(module, ini_info.dynamic_metadata))
     md_dict.update(ini_info.metadata)
+    vconfig = getattr(ini_info, "variant_config", None)
+    if vconfig is not None:
+        md_dict.update(vconfig.to_metadata_dict())
     return Metadata(md_dict)
 
 

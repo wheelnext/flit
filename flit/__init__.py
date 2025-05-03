@@ -83,6 +83,20 @@ def add_shared_build_options(parser: argparse.ArgumentParser):
         help="Select a format to publish. Options: 'wheel', 'sdist'"
     )
 
+    parser.add_argument(
+        "-p",
+        "--variant_property",
+        dest="vprops",
+        type=str,
+        action="extend",
+        nargs="+",
+        help=(
+            "Variant Properties to add to the Wheel Variant, can be repeated as many "
+            "times as needed"
+        ),
+        default=[],
+    )
+
     setup_py_grp = parser.add_mutually_exclusive_group()
 
     setup_py_grp.add_argument('--setup-py', action='store_true',
@@ -198,9 +212,10 @@ def main(argv=None):
         from .build import main
         try:
             main(args.ini_file, formats=set(args.format or []),
-                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs())
+                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(), vprops=args.vprops)
         except(common.NoDocstringError, common.VCSError, common.NoVersionError) as e:
             sys.exit(e.args[0])
+
     elif args.subcmd == 'publish':
         if args.deprecated_repository:
             log.warning("Passing --repository before the 'upload' subcommand is deprecated: pass it after")

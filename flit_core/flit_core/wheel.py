@@ -79,10 +79,10 @@ class WheelBuilder:
                              compression=zipfile.ZIP_DEFLATED)
 
     @classmethod
-    def from_ini_path(cls, ini_path, target_fp):
+    def from_ini_path(cls, ini_path, target_fp, vprops: list[str] | None = None):
         from .config import read_flit_config
         directory = ini_path.parent
-        ini_info = read_flit_config(ini_path)
+        ini_info = read_flit_config(ini_path, vprops=vprops)
         entrypoints = ini_info.entrypoints
         module = common.Module(ini_info.module, directory)
         metadata = common.make_metadata(module, ini_info)
@@ -98,7 +98,10 @@ class WheelBuilder:
     def wheel_filename(self):
         dist_name = common.normalize_dist_name(self.metadata.name, self.metadata.version)
         tag = ('py2.' if self.metadata.supports_py2 else '') + 'py3-none-any'
-        return '{}-{}.whl'.format(dist_name, tag)
+        if self.metadata.variant_hash is None:
+            return '{}-{}.whl'.format(dist_name, tag)
+        else:
+            return '{}-{}-{}.whl'.format(dist_name, tag, self.metadata.variant_hash)
 
     def _add_file(self, full_path, rel_path):
         log.debug("Adding %s to zip file", full_path)
@@ -213,13 +216,16 @@ class WheelBuilder:
         finally:
             self.wheel_zip.close()
 
-def make_wheel_in(ini_path, wheel_directory, editable=False):
+def make_wheel_in(ini_path, wheel_directory, editable=False, vprops: list[str] | None = None):
     # We don't know the final filename until metadata is loaded, so write to
     # a temporary_file, and rename it afterwards.
+    if vprops is None:
+        vprops = []
+
     (fd, temp_path) = tempfile.mkstemp(suffix='.whl', dir=str(wheel_directory))
     try:
         with open(fd, 'w+b') as fp:
-            wb = WheelBuilder.from_ini_path(ini_path, fp)
+            wb = WheelBuilder.from_ini_path(ini_path, fp, vprops=vprops)
             wb.build(editable)
 
         wheel_path = wheel_directory / wb.wheel_filename
