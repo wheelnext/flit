@@ -83,7 +83,9 @@ def add_shared_build_options(parser: argparse.ArgumentParser):
         help="Select a format to publish. Options: 'wheel', 'sdist'"
     )
 
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group(required=False)
+
+    group.add_argument(
         "-p",
         "--variant_property",
         dest="vprops",
@@ -94,7 +96,13 @@ def add_shared_build_options(parser: argparse.ArgumentParser):
             "Variant Properties to add to the Wheel Variant, can be repeated as many "
             "times as needed"
         ),
-        default=[],
+        default=None,
+    )
+
+    group.add_argument(
+        "--null-variant",
+        action="store_true",
+        help="make the variant a `null variant` - no variant property.",
     )
 
     setup_py_grp = parser.add_mutually_exclusive_group()
@@ -212,7 +220,7 @@ def main(argv=None):
         from .build import main
         try:
             main(args.ini_file, formats=set(args.format or []),
-                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(), vprops=args.vprops)
+                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(), vprops=args.vprops if not args.null_variant else [])
         except(common.NoDocstringError, common.VCSError, common.NoVersionError) as e:
             sys.exit(e.args[0])
 

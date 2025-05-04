@@ -79,7 +79,7 @@ class WheelBuilder:
                              compression=zipfile.ZIP_DEFLATED)
 
     @classmethod
-    def from_ini_path(cls, ini_path, target_fp, vprops: list[str] | None = None):
+    def from_ini_path(cls, ini_path, target_fp, vprops: list[str] | None):
         from .config import read_flit_config
         directory = ini_path.parent
         ini_info = read_flit_config(ini_path, vprops=vprops)
@@ -219,8 +219,6 @@ class WheelBuilder:
 def make_wheel_in(ini_path, wheel_directory, editable=False, vprops: list[str] | None = None):
     # We don't know the final filename until metadata is loaded, so write to
     # a temporary_file, and rename it afterwards.
-    if vprops is None:
-        vprops = []
 
     (fd, temp_path) = tempfile.mkstemp(suffix='.whl', dir=str(wheel_directory))
     try:

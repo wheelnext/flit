@@ -33,9 +33,6 @@ def main(ini_file: Path, formats=None, gen_setup_py=True, use_vcs=True, vprops: 
 
     elif not formats.issubset(ALL_FORMATS):
         raise ValueError("Unknown package formats: {}".format(formats - ALL_FORMATS))
-    
-    if vprops is None:
-        vprops = []
 
     sdist_info = wheel_info = None
     dist_dir = ini_file.parent / 'dist'

@@ -98,7 +98,7 @@ class EntryPointsConflict(ConfigError):
         return ('Please specify console_scripts entry points, or [scripts] in '
             'flit config, not both.')
 
-def prep_toml_config(d, path, vprops: list[str] | None = None):
+def prep_toml_config(d, path, vprops: list[str] | None):
     """Validate config loaded from pyproject.toml and prepare common metadata
 
     Returns a LoadedConfig object.
@@ -314,11 +314,16 @@ class VariantConfig:
     providers: dict[str, VariantProviderConfig]
 
     @classmethod
-    def from_dict(cls, data: dict, vprops: list[str] | None = None):
+    def from_dict(cls, data: dict, vprops: list[str] | None):
         """Creates an instance of VariantConfig from a dictionary."""
         data = data.copy()
 
-        if vprops is None or not vprops:
+        if vprops is None:
+            data["vhash"] = None
+            data["properties"] = None
+
+        
+        elif len(vprops) == 0:
             data["vhash"] = "0" * VARIANT_HASH_LEN
             data["properties"] = []
 
