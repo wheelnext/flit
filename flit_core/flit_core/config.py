@@ -104,7 +104,7 @@ def prep_toml_config(d, path, vprops: list[str] | None):
     Returns a LoadedConfig object.
     """
     dtool = d.get('tool', {}).get('flit', {})
-    dvariant = d.get('variant-providers', {})
+    dvariant = d.get('variant', {})
 
     if 'project' in d:
         # Metadata in [project] table (PEP 621)
@@ -142,7 +142,7 @@ def prep_toml_config(d, path, vprops: list[str] | None):
         raise ConfigError(
             "Neither [project] nor [tool.flit.metadata] found in pyproject.toml"
         )
-    
+
     if dvariant:
         loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops)
         loaded_cfg.variant_config.validate()
@@ -322,7 +322,7 @@ class VariantConfig:
             data["vhash"] = None
             data["properties"] = None
 
-        
+
         elif len(vprops) == 0:
             data["vhash"] = "0" * VARIANT_HASH_LEN
             data["properties"] = []
