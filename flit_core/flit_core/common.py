@@ -354,7 +354,7 @@ class Metadata:
     variant_hash = None
     variant_properties = ()
     variant_requires = ()
-    variant_entry_points = ()
+    variant_plugin_apis = ()
     variant_default_namespace_priorities = ()
     variant_default_feature_priorities = ()
     variant_default_property_priorities = ()
@@ -458,8 +458,8 @@ class Metadata:
                 fp.write('Variant-property: {}\n'.format(vprop))
             for vreq in self.variant_requires:
                 fp.write('Variant-requires: {}\n'.format(vreq))
-            for vEP in self.variant_entry_points:
-                fp.write('Variant-entry-point: {}\n'.format(vEP))
+            for vAPI in self.variant_plugin_apis:
+                fp.write('Variant-plugin-api: {}\n'.format(vAPI))
             if self.variant_default_namespace_priorities:
                 fp.write('Variant-default-namespace-priorities: {}\n'.format(
                     ', '.join(self.variant_default_namespace_priorities)

@@ -287,7 +287,7 @@ class LoadedConfig:
 @dataclass
 class VariantProviderConfig:
     requires: list[str]
-    entry_point: str
+    plugin_api: str
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -302,8 +302,8 @@ class VariantProviderConfig:
         """Validates the VariantProviderConfig instance."""
         if not self.requires:
             raise ValueError("Requires list cannot be empty")
-        if not self.entry_point:
-            raise ValueError("Entry-Point cannot be empty")
+        if not self.plugin_api:
+            raise ValueError("Plugin-API cannot be empty")
 
 
 @dataclass
@@ -375,8 +375,8 @@ class VariantConfig:
                 for namespace, provider_cfg in self.providers.items()
                 for preq in provider_cfg.requires
             ],
-            "variant_entry_points": [
-                f"{namespace}: {provider_cfg.entry_point}"
+            "variant_plugin_apis": [
+                f"{namespace}: {provider_cfg.plugin_api}"
                 for namespace, provider_cfg in self.providers.items()
             ],
             "variant_default_namespace_priorities": self.default_priorities[
