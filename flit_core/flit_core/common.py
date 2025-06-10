@@ -1,15 +1,32 @@
 import ast
 from contextlib import contextmanager
+from collections import defaultdict
 import hashlib
 import logging
 import os
 import sys
+import json
+from typing import Any
 
 from pathlib import Path
 import re
 
 log = logging.getLogger(__name__)
 
+from .variant_constants import (
+    VALIDATION_PROPERTY_REGEX, 
+    VARIANTS_JSON_SCHEMA_KEY,
+    VARIANTS_JSON_SCHEMA_URL,
+    VARIANTS_JSON_VARIANT_DATA_KEY,
+    VARIANT_INFO_DEFAULT_PRIO_KEY,
+    VARIANT_INFO_FEATURE_KEY,
+    VARIANT_INFO_NAMESPACE_KEY,
+    VARIANT_INFO_PROPERTY_KEY,
+    VARIANT_INFO_PROVIDER_DATA_KEY,
+    VARIANT_INFO_PROVIDER_PLUGIN_API_KEY, 
+    VARIANT_INFO_PROVIDER_ENABLE_IF_KEY,
+    VARIANT_INFO_PROVIDER_REQUIRES_KEY
+)
 from .versionno import normalise_version
 
 class Module:
@@ -351,13 +368,14 @@ class Metadata:
     license_files = ()
     dynamic = ()
 
-    variant_hash = None
-    variant_properties = ()
-    variant_requires = ()
-    variant_plugin_apis = ()
-    variant_default_namespace_priorities = ()
-    variant_default_feature_priorities = ()
-    variant_default_property_priorities = ()
+    variant_hash: str | None = None
+    variant_properties: list[str] = []
+    variant_plugins: dict[str, dict[str, list[str] | str]] = {}
+    variant_default_priorities: dict[str, Any] = {
+        "namespace": [],
+        "feature": {},
+        "property": {}
+    }
 
     metadata_version = "2.4"
 
@@ -452,26 +470,74 @@ class Metadata:
         if self.description is not None:
             fp.write('\n' + self.description + '\n')
 
+
+    def write_variants_json_file(self, fp):
+        """Write out Variant Metadata in json format"""
+
         if self.variant_hash is not None:
-            fp.write('Variant-hash: {}\n'.format(self.variant_hash))
-            for vprop in self.variant_properties:
-                fp.write('Variant-property: {}\n'.format(vprop))
-            for vreq in self.variant_requires:
-                fp.write('Variant-requires: {}\n'.format(vreq))
-            for vAPI in self.variant_plugin_apis:
-                fp.write('Variant-plugin-api: {}\n'.format(vAPI))
-            if self.variant_default_namespace_priorities:
-                fp.write('Variant-default-namespace-priorities: {}\n'.format(
-                    ', '.join(self.variant_default_namespace_priorities)
-                ))
-            if self.variant_default_feature_priorities:
-                fp.write('Variant-default-feature-priorities: {}\n'.format(
-                    ', '.join(self.variant_default_feature_priorities)
-                ))
-            if self.variant_default_property_priorities:
-                fp.write('Variant-default-property-priorities: {}\n'.format(
-                    ', '.join(self.variant_default_property_priorities)
-                ))
+            data = {
+                VARIANTS_JSON_SCHEMA_KEY: VARIANTS_JSON_SCHEMA_URL,
+                VARIANT_INFO_DEFAULT_PRIO_KEY: {},
+                VARIANT_INFO_PROVIDER_DATA_KEY: {},
+                VARIANTS_JSON_VARIANT_DATA_KEY: {}
+            }
+            
+            # ==================== VARIANT_INFO_DEFAULT_PRIO_KEY ==================== #
+            
+            if (ns_prio := self.variant_default_priorities["namespace"]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY] = ns_prio
+
+            if (feat_prio := self.variant_default_priorities["feature"]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_FEATURE_KEY] = feat_prio
+
+            if (prop_prio := self.variant_default_priorities["property"]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_PROPERTY_KEY] = prop_prio
+
+            if not data[VARIANT_INFO_DEFAULT_PRIO_KEY]:
+                # If no default priorities are set, remove the key
+                del data[VARIANT_INFO_DEFAULT_PRIO_KEY]
+
+            # ==================== VARIANT_INFO_PROVIDER_DATA_KEY ==================== #
+
+            variant_providers = defaultdict(dict)
+            for ns, plugin_conf in self.variant_plugins.items():
+                variant_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = plugin_conf.get("requires", [])
+                
+                if (enable_if := plugin_conf.get("enable_if", None)) is not None:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_ENABLE_IF_KEY] = enable_if
+
+                if (plugin_api := plugin_conf.get("plugin_api", None)) is not None:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
+
+            data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
+            
+            # ==================== VARIANTS_JSON_VARIANT_DATA_KEY ==================== #
+
+            variant_data = defaultdict(lambda: defaultdict(set))
+            for vprop_str in self.variant_properties:
+                match = VALIDATION_PROPERTY_REGEX.match(vprop_str)
+                if not match:
+                    raise ValueError(
+                        f"Invalid variant property '{vprop_str}' in variant {self.variant_hash}"
+                    )
+                namespace = match.group('namespace')
+                feature = match.group('feature')
+                value = match.group('value')
+                variant_data[namespace][feature].add(value)
+            data[VARIANTS_JSON_VARIANT_DATA_KEY][self.variant_hash] = variant_data
+
+            def preprocess(data):
+                """Preprocess the data to ensure it is JSON serializable."""
+                if isinstance(data, (defaultdict, dict)):
+                    return {k: preprocess(v) for k, v in data.items()}
+                if isinstance(data, set):
+                    return list(data)
+                return data
+
+            json.dump(
+                preprocess(data), fp, indent=4, sort_keys=True, ensure_ascii=False
+            )
+        
 
     @property
     def supports_py2(self):
@@ -488,7 +554,7 @@ def make_metadata(module, ini_info):
     md_dict.update(ini_info.metadata)
     vconfig = getattr(ini_info, "variant_config", None)
     if vconfig is not None:
-        md_dict.update(vconfig.to_metadata_dict())
+        md_dict.update(vconfig.to_variant_cfg_dict())
     return Metadata(md_dict)
 
 

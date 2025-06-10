@@ -11,6 +11,7 @@ from .common import (
 from .config import read_flit_config
 from .wheel import make_wheel_in, _write_wheel_file
 from .sdist import SdistBuilder
+from .variant_constants import VARIANT_DIST_INFO_FILENAME
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,9 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
 
     with open(osp.join(dist_info, 'METADATA'), 'w', encoding='utf-8') as f:
         metadata.write_metadata_file(f)
+
+    with open(osp.join(dist_info, VARIANT_DIST_INFO_FILENAME), 'w', encoding='utf-8') as f:
+        metadata.write_variants_json_file(f)
 
     if ini_info.entrypoints:
         with open(osp.join(dist_info, 'entry_points.txt'), 'w', encoding='utf-8') as f:

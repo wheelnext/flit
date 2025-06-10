@@ -287,7 +287,8 @@ class LoadedConfig:
 @dataclass
 class VariantProviderConfig:
     requires: list[str]
-    plugin_api: str
+    plugin_api: str | None = None
+    enable_if: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -302,8 +303,6 @@ class VariantProviderConfig:
         """Validates the VariantProviderConfig instance."""
         if not self.requires:
             raise ValueError("Requires list cannot be empty")
-        if not self.plugin_api:
-            raise ValueError("Plugin-API cannot be empty")
 
 
 @dataclass
@@ -365,25 +364,24 @@ class VariantConfig:
         for provider_cfg in self.providers.values():
             provider_cfg.validate()
 
-    def to_metadata_dict(self) -> dict[str, Any]:
+    def to_variant_cfg_dict(self) -> dict[str, Any]:
         """Converts the VariantConfig instance to a metadata dictionary."""
         return {
             "variant_hash": self.vhash,
             "variant_properties": self.properties,
-            "variant_requires": [
-                f"{namespace}: {preq}"
+            "variant_plugins": {
+                namespace: {
+                    "requires": provider_cfg.requires,
+                    "plugin_api": provider_cfg.plugin_api,
+                    "enable_if": provider_cfg.enable_if
+                }
                 for namespace, provider_cfg in self.providers.items()
-                for preq in provider_cfg.requires
-            ],
-            "variant_plugin_apis": [
-                f"{namespace}: {provider_cfg.plugin_api}"
-                for namespace, provider_cfg in self.providers.items()
-            ],
-            "variant_default_namespace_priorities": self.default_priorities[
-                "namespace"
-            ],
-            "variant_default_feature_priorities": self.default_priorities["feature"],
-            "variant_default_property_priorities": self.default_priorities["property"],
+            },
+            "variant_default_priorities": {
+                "namespace": self.default_priorities.get("namespace", []),
+                "feature": self.default_priorities.get("feature", {}),
+                "property": self.default_priorities.get("property", {})
+            }
         }
 
 

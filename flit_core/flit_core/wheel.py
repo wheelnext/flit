@@ -16,6 +16,7 @@ import zipfile
 
 from flit_core import __version__
 from . import common
+from .variant_constants import VARIANT_DIST_INFO_FILENAME
 
 log = logging.getLogger(__name__)
 
@@ -194,6 +195,10 @@ class WheelBuilder:
 
         with self._write_to_zip(self.dist_info + '/METADATA') as f:
             self.metadata.write_metadata_file(f)
+
+        if self.metadata.variant_hash is not None:
+            with self._write_to_zip(self.dist_info + f'/{VARIANT_DIST_INFO_FILENAME}') as f:
+                self.metadata.write_variants_json_file(f)
 
     def write_record(self):
         log.info('Writing the record of files')

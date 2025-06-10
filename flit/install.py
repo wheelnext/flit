@@ -14,6 +14,7 @@ import tempfile
 from subprocess import check_call, check_output
 import sysconfig
 
+from flit_core.variant_constants import VARIANT_DIST_INFO_FILENAME
 from flit_core import common
 from .config import read_flit_config
 from ._get_dirs import get_dirs
@@ -383,6 +384,10 @@ class Installer(object):
         with (dist_info / 'METADATA').open('w', encoding='utf-8') as f:
             metadata.write_metadata_file(f)
         self.installed_files.append(dist_info / 'METADATA')
+
+        with open(osp.join(dist_info, VARIANT_DIST_INFO_FILENAME), 'w', encoding='utf-8') as f:
+            metadata.write_variants_json_file(f)
+        self.installed_files.append(dist_info / VARIANT_DIST_INFO_FILENAME)
 
         with (dist_info / 'INSTALLER').open('w', encoding='utf-8') as f:
             f.write('flit')
