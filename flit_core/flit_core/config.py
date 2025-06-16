@@ -311,6 +311,7 @@ class VariantConfig:
     properties: list[str]
     default_priorities: dict[str, list[str]]
     providers: dict[str, VariantProviderConfig]
+    optional_providers: dict[str, VariantProviderConfig]
 
     @classmethod
     def from_dict(cls, data: dict, vprops: list[str] | None):
@@ -349,6 +350,10 @@ class VariantConfig:
             provider: VariantProviderConfig.from_dict(provider_data)
             for provider, provider_data in data["providers"].items()
         }
+        data["optional_providers"] = {
+            provider: VariantProviderConfig.from_dict(provider_data)
+            for provider, provider_data in data["optional_providers"].items()
+        }
 
         # Create an instance of VariantConfig
         return cls(**data)
@@ -356,12 +361,14 @@ class VariantConfig:
     def validate(self):
         """Validates the VariantConfig instance."""
         for namespace in self.default_priorities["namespace"]:
-            if namespace not in self.providers:
+            if namespace not in (*self.providers, *self.optional_providers):
                 raise ValueError(
                     f"Namespace '{namespace}' is not defined in the variant providers"
                 )
 
         for provider_cfg in self.providers.values():
+            provider_cfg.validate()
+        for provider_cfg in self.optional_providers.values():
             provider_cfg.validate()
 
     def to_variant_cfg_dict(self) -> dict[str, Any]:
@@ -376,6 +383,14 @@ class VariantConfig:
                     "enable_if": provider_cfg.enable_if
                 }
                 for namespace, provider_cfg in self.providers.items()
+            },
+            "variant_optional_plugins": {
+                namespace: {
+                    "requires": provider_cfg.requires,
+                    "plugin_api": provider_cfg.plugin_api,
+                    "enable_if": provider_cfg.enable_if
+                }
+                for namespace, provider_cfg in self.optional_providers.items()
             },
             "variant_default_priorities": {
                 "namespace": self.default_priorities.get("namespace", []),

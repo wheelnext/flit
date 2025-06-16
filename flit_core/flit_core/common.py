@@ -14,7 +14,7 @@ import re
 log = logging.getLogger(__name__)
 
 from .variant_constants import (
-    VALIDATION_PROPERTY_REGEX, 
+    VALIDATION_PROPERTY_REGEX,
     VARIANTS_JSON_SCHEMA_KEY,
     VARIANTS_JSON_SCHEMA_URL,
     VARIANTS_JSON_VARIANT_DATA_KEY,
@@ -22,8 +22,9 @@ from .variant_constants import (
     VARIANT_INFO_FEATURE_KEY,
     VARIANT_INFO_NAMESPACE_KEY,
     VARIANT_INFO_PROPERTY_KEY,
+    VARIANT_INFO_OPTIONAL_PROVIDER_DATA_KEY,
     VARIANT_INFO_PROVIDER_DATA_KEY,
-    VARIANT_INFO_PROVIDER_PLUGIN_API_KEY, 
+    VARIANT_INFO_PROVIDER_PLUGIN_API_KEY,
     VARIANT_INFO_PROVIDER_ENABLE_IF_KEY,
     VARIANT_INFO_PROVIDER_REQUIRES_KEY
 )
@@ -371,6 +372,7 @@ class Metadata:
     variant_hash: str | None = None
     variant_properties: list[str] = []
     variant_plugins: dict[str, dict[str, list[str] | str]] = {}
+    variant_optional_plugins: dict[str, dict[str, list[str] | str]] = {}
     variant_default_priorities: dict[str, Any] = {
         "namespace": [],
         "feature": {},
@@ -481,9 +483,9 @@ class Metadata:
                 VARIANT_INFO_PROVIDER_DATA_KEY: {},
                 VARIANTS_JSON_VARIANT_DATA_KEY: {}
             }
-            
+
             # ==================== VARIANT_INFO_DEFAULT_PRIO_KEY ==================== #
-            
+
             if (ns_prio := self.variant_default_priorities["namespace"]):
                 data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY] = ns_prio
 
@@ -502,7 +504,7 @@ class Metadata:
             variant_providers = defaultdict(dict)
             for ns, plugin_conf in self.variant_plugins.items():
                 variant_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = plugin_conf.get("requires", [])
-                
+
                 if (enable_if := plugin_conf.get("enable_if", None)) is not None:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_ENABLE_IF_KEY] = enable_if
 
@@ -510,7 +512,21 @@ class Metadata:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
 
             data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
-            
+
+            # ================ VARIANT_INFO_OPTIONAL_PROVIDER_DATA_KEY ================ #
+
+            variant_optional_providers = defaultdict(dict)
+            for ns, plugin_conf in self.variant_optional_plugins.items():
+                variant_optional_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = plugin_conf.get("requires", [])
+
+                if (enable_if := plugin_conf.get("enable_if", None)) is not None:
+                    variant_optional_providers[ns][VARIANT_INFO_PROVIDER_ENABLE_IF_KEY] = enable_if
+
+                if (plugin_api := plugin_conf.get("plugin_api", None)) is not None:
+                    variant_optional_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
+
+            data[VARIANT_INFO_OPTIONAL_PROVIDER_DATA_KEY] = variant_optional_providers
+
             # ==================== VARIANTS_JSON_VARIANT_DATA_KEY ==================== #
 
             variant_data = defaultdict(lambda: defaultdict(set))
@@ -537,7 +553,7 @@ class Metadata:
             json.dump(
                 preprocess(data), fp, indent=4, sort_keys=True, ensure_ascii=False
             )
-        
+
 
     @property
     def supports_py2(self):
