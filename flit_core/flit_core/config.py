@@ -289,6 +289,7 @@ class VariantProviderConfig:
     requires: list[str]
     plugin_api: str | None = None
     enable_if: str | None = None
+    optional: bool = False
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -374,7 +375,8 @@ class VariantConfig:
                 namespace: {
                     "requires": provider_cfg.requires,
                     "plugin_api": provider_cfg.plugin_api,
-                    "enable_if": provider_cfg.enable_if
+                    "enable_if": provider_cfg.enable_if,
+                    "optional": provider_cfg.optional,
                 }
                 for namespace, provider_cfg in self.providers.items()
             },
