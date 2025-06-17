@@ -335,7 +335,8 @@ class VariantConfig:
             for vprop in _vprops:
                 assert len(vprop) == 3, f"Invalid variant property: {vprop}"
 
-            data["properties"] = [" :: ".join(vprop) for vprop in _vprops]
+            data["properties"] = [" :: ".join(vprop) for vprop in sorted(_vprops)]
+
             hash_object = hashlib.sha256()
             for vprop in data["properties"]:
                 hash_object.update(f"{vprop}\n".encode())
