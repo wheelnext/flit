@@ -105,6 +105,11 @@ def add_shared_build_options(parser: argparse.ArgumentParser):
         help="make the variant a `null variant` - no variant property.",
     )
 
+    parser.add_argument(
+        "--variant-label",
+        help="Use a custom variant label (the default is variant hash)",
+    )
+
     setup_py_grp = parser.add_mutually_exclusive_group()
 
     setup_py_grp.add_argument('--setup-py', action='store_true',
@@ -220,7 +225,9 @@ def main(argv=None):
         from .build import main
         try:
             main(args.ini_file, formats=set(args.format or []),
-                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(), vprops=args.vprops if not args.null_variant else [])
+                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(),
+                 vprops=args.vprops if not args.null_variant else [],
+                 variant_label=args.variant_label)
         except(common.NoDocstringError, common.VCSError, common.NoVersionError) as e:
             sys.exit(e.args[0])
 

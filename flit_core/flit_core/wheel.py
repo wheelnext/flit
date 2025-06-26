@@ -80,10 +80,11 @@ class WheelBuilder:
                              compression=zipfile.ZIP_DEFLATED)
 
     @classmethod
-    def from_ini_path(cls, ini_path, target_fp, vprops: list[str] | None):
+    def from_ini_path(cls, ini_path, target_fp, vprops: list[str] | None,
+                      variant_label: str | None):
         from .config import read_flit_config
         directory = ini_path.parent
-        ini_info = read_flit_config(ini_path, vprops=vprops)
+        ini_info = read_flit_config(ini_path, vprops=vprops, variant_label=variant_label)
         entrypoints = ini_info.entrypoints
         module = common.Module(ini_info.module, directory)
         metadata = common.make_metadata(module, ini_info)
@@ -221,14 +222,17 @@ class WheelBuilder:
         finally:
             self.wheel_zip.close()
 
-def make_wheel_in(ini_path, wheel_directory, editable=False, vprops: list[str] | None = None):
+def make_wheel_in(ini_path, wheel_directory, editable=False,
+                  vprops: list[str] | None = None,
+                  variant_label: str | None = None):
     # We don't know the final filename until metadata is loaded, so write to
     # a temporary_file, and rename it afterwards.
 
     (fd, temp_path) = tempfile.mkstemp(suffix='.whl', dir=str(wheel_directory))
     try:
         with open(fd, 'w+b') as fp:
-            wb = WheelBuilder.from_ini_path(ini_path, fp, vprops=vprops)
+            wb = WheelBuilder.from_ini_path(ini_path, fp, vprops=vprops,
+                                            variant_label=variant_label)
             wb.build(editable)
 
         wheel_path = wheel_directory / wb.wheel_filename

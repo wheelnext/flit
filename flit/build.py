@@ -26,7 +26,8 @@ def unpacked_tarball(path):
         assert len(files) == 1, files
         yield os.path.join(tmpdir, files[0])
 
-def main(ini_file: Path, formats=None, gen_setup_py=True, use_vcs=True, vprops: list[str] | None = None):
+def main(ini_file: Path, formats=None, gen_setup_py=True, use_vcs=True,
+         vprops: list[str] | None = None, variant_label: str | None = None):
     """Build wheel and sdist"""
     if not formats:
         formats = ALL_FORMATS
@@ -54,7 +55,8 @@ def main(ini_file: Path, formats=None, gen_setup_py=True, use_vcs=True, vprops: 
                     tmp_ini_file = Path(tmpdir, ini_file.name)
                     wheel_info = make_wheel_in(tmp_ini_file, dist_dir)
         elif 'wheel' in formats:
-            wheel_info = make_wheel_in(ini_file, dist_dir, vprops=vprops)
+            wheel_info = make_wheel_in(ini_file, dist_dir, vprops=vprops,
+                                       variant_label=variant_label)
     except ConfigError as e:
         sys.exit('Config error: {}'.format(e))
 

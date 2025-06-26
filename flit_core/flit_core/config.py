@@ -86,11 +86,12 @@ default_license_files_globs = ['COPYING*', 'LICEN[CS]E*']
 license_files_allowed_chars = re.compile(r'^[\w\-\.\/\*\?\[\]]+$')
 
 
-def read_flit_config(path, vprops: list[str] | None = None):
+def read_flit_config(path, vprops: list[str] | None = None,
+                     variant_label: str | None = None):
     """Read and check the `pyproject.toml` file with data about the package.
     """
     d = tomllib.loads(path.read_text('utf-8'))
-    return prep_toml_config(d, path, vprops=vprops)
+    return prep_toml_config(d, path, vprops=vprops, variant_label=variant_label)
 
 
 class EntryPointsConflict(ConfigError):
@@ -98,7 +99,8 @@ class EntryPointsConflict(ConfigError):
         return ('Please specify console_scripts entry points, or [scripts] in '
             'flit config, not both.')
 
-def prep_toml_config(d, path, vprops: list[str] | None):
+def prep_toml_config(d, path, vprops: list[str] | None,
+                     variant_label: str | None = None):
     """Validate config loaded from pyproject.toml and prepare common metadata
 
     Returns a LoadedConfig object.
@@ -144,7 +146,8 @@ def prep_toml_config(d, path, vprops: list[str] | None):
         )
 
     if dvariant:
-        loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops)
+        loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops,
+                                                            variant_label=variant_label)
         loaded_cfg.variant_config.validate()
 
     unknown_sections = set(dtool) - {
@@ -314,7 +317,8 @@ class VariantConfig:
     providers: dict[str, VariantProviderConfig]
 
     @classmethod
-    def from_dict(cls, data: dict, vprops: list[str] | None):
+    def from_dict(cls, data: dict, vprops: list[str] | None,
+                  variant_label: str | None):
         """Creates an instance of VariantConfig from a dictionary."""
         data = data.copy()
 
@@ -342,6 +346,9 @@ class VariantConfig:
             for vprop in data["properties"]:
                 hash_object.update(f"{vprop}\n".encode())
             data["vhash"] = hash_object.hexdigest()[:VARIANT_HASH_LEN]
+
+        if variant_label is not None:
+            data["vhash"] = variant_label
 
         # Convert hyphenated keys to underscored keys
         data = {key.replace("-", "_"): value for key, value in data.items()}
