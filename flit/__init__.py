@@ -87,7 +87,7 @@ def add_shared_build_options(parser: argparse.ArgumentParser):
 
     group.add_argument(
         "-p",
-        "--variant_property",
+        "--variant-property",
         dest="vprops",
         type=str,
         action="extend",
