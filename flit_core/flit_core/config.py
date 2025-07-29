@@ -8,7 +8,7 @@ from pathlib import Path
 from contextlib import suppress
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import hashlib
 
@@ -86,8 +86,8 @@ default_license_files_globs = ['COPYING*', 'LICEN[CS]E*']
 license_files_allowed_chars = re.compile(r'^[\w\-\.\/\*\?\[\]]+$')
 
 
-def read_flit_config(path, vprops: list[str] | None = None,
-                     variant_label: str | None = None):
+def read_flit_config(path, vprops: Optional[list[str]] = None,
+                     variant_label: Optional[str] = None):
     """Read and check the `pyproject.toml` file with data about the package.
     """
     d = tomllib.loads(path.read_text('utf-8'))
@@ -99,8 +99,8 @@ class EntryPointsConflict(ConfigError):
         return ('Please specify console_scripts entry points, or [scripts] in '
             'flit config, not both.')
 
-def prep_toml_config(d, path, vprops: list[str] | None,
-                     variant_label: str | None = None):
+def prep_toml_config(d, path, vprops: Optional[list[str]],
+                     variant_label: Optional[str] = None):
     """Validate config loaded from pyproject.toml and prepare common metadata
 
     Returns a LoadedConfig object.
@@ -278,7 +278,7 @@ class LoadedConfig:
         self.sdist_exclude_patterns = []
         self.dynamic_metadata = []
         self.data_directory = None
-        self.variant_config: VariantConfig | None = None
+        self.variant_config: Optional[VariantConfig] = None
 
     def add_scripts(self, scripts_dict):
         if scripts_dict:
@@ -290,8 +290,8 @@ class LoadedConfig:
 @dataclass
 class VariantProviderConfig:
     requires: list[str]
-    plugin_api: str | None = None
-    enable_if: str | None = None
+    plugin_api: Optional[str] = None
+    enable_if: Optional[str] = None
     optional: bool = False
 
     @classmethod
@@ -317,8 +317,8 @@ class VariantConfig:
     providers: dict[str, VariantProviderConfig]
 
     @classmethod
-    def from_dict(cls, data: dict, vprops: list[str] | None,
-                  variant_label: str | None):
+    def from_dict(cls, data: dict, vprops: Optional[list[str]],
+                  variant_label: Optional[str]):
         """Creates an instance of VariantConfig from a dictionary."""
         data = data.copy()
 
