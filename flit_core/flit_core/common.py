@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 import json
-from typing import Any
+from typing import Any, Optional, Union
 
 from pathlib import Path
 import re
@@ -369,9 +369,9 @@ class Metadata:
     license_files = ()
     dynamic = ()
 
-    variant_hash: str | None = None
+    variant_hash: Optional[str] = None
     variant_properties: list[str] = []
-    variant_plugins: dict[str, dict[str, list[str] | str]] = {}
+    variant_plugins: dict[str, dict[str, Union[list[str],str]]] = {}
     variant_default_priorities: dict[str, Any] = {
         "namespace": [],
         "feature": {},
