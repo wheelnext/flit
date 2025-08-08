@@ -328,7 +328,7 @@ class VariantConfig:
 
 
         elif len(vprops) == 0:
-            data["vhash"] = "0" * VARIANT_HASH_LEN
+            data["vhash"] = "null"
             data["properties"] = []
 
         else:
