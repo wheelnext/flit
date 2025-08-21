@@ -26,11 +26,9 @@ from ._spdx_data import licenses
 from .common import normalise_core_metadata_name
 from .versionno import normalise_version
 
+from .variant_constants import VARIANT_LABEL_LENGTH
+
 log = logging.getLogger(__name__)
-
-
-VARIANT_HASH_LEN = 8
-
 
 class ConfigError(ValueError):
     pass
@@ -328,7 +326,7 @@ class VariantConfig:
 
 
         elif len(vprops) == 0:
-            data["vhash"] = "0" * VARIANT_HASH_LEN
+            data["vhash"] = "null"
             data["properties"] = []
 
         else:
@@ -345,7 +343,7 @@ class VariantConfig:
             hash_object = hashlib.sha256()
             for vprop in data["properties"]:
                 hash_object.update(f"{vprop}\n".encode())
-            data["vhash"] = hash_object.hexdigest()[:VARIANT_HASH_LEN]
+            data["vhash"] = hash_object.hexdigest()[:VARIANT_LABEL_LENGTH]
 
         if variant_label is not None:
             data["vhash"] = variant_label

@@ -7,7 +7,7 @@ import re
 from typing import Literal
 from typing import TypedDict
 
-VARIANT_HASH_LEN = 8
+VARIANT_LABEL_LENGTH = 16
 CONFIG_FILENAME = "variants.toml"
 VARIANT_DIST_INFO_FILENAME = "variant.json"
 
@@ -28,7 +28,7 @@ VARIANTS_JSON_SCHEMA_KEY: Literal["$schema"] = "$schema"
 VARIANTS_JSON_SCHEMA_URL = "https://variants-schema.wheelnext.dev/"
 VARIANTS_JSON_VARIANT_DATA_KEY: Literal["variants"] = "variants"
 
-VALIDATION_VARIANT_HASH_REGEX = re.compile(rf"[0-9a-f]{{{VARIANT_HASH_LEN}}}")
+VALIDATION_VARIANT_HASH_REGEX = re.compile(rf"[0-9a-f]{{{VARIANT_LABEL_LENGTH}}}")
 
 VALIDATION_NAMESPACE_REGEX = re.compile(r"[a-z0-9_]+")
 VALIDATION_FEATURE_NAME_REGEX = re.compile(r"[a-z0-9_]+")
@@ -83,22 +83,22 @@ VALIDATION_PYTHON_PACKAGE_NAME_REGEX = re.compile(
     r"[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9]", re.IGNORECASE
 )
 VALIDATION_WHEEL_NAME_REGEX = re.compile(
-    r"(?P<base_wheel_name>                "  # <base_wheel_name> group (without variant)
-    r"  (?P<namever>                      "  # "namever" group contains <name>-<ver>
-    r"    (?P<name>[^\s-]+?)              "  # <name>
-    r"    - (?P<ver>[^\s-]*?)             "  # "-" <ver>
-    r"  )                                 "  # close "namever" group
-    r"  ( - (?P<build>\d[^-]*?) )?        "  # optional "-" <build>
-    r"  - (?P<pyver>[^\s-]+?)             "  # "-" <pyver> tag
-    r"  - (?P<abi>[^\s-]+?)               "  # "-" <abi> tag
-    r"  - (?P<plat>[^\s-]+?)              "  # "-" <plat> tag
-    r")                                   "  # end of <base_wheel_name> group
-    r"( - (?P<variant_hash>               "  # optional <variant_hash>
-    rf"    [0-9a-f]{{{VARIANT_HASH_LEN}}} "
-    r"    )                               "
-    r")?                                  "
-    r"\.whl                               "  # ".whl" suffix
-    r"                                    ",
+    r"(?P<base_wheel_name>                    "  # <base_wheel_name> group (without variant)
+    r"  (?P<namever>                          "  # "namever" group contains <name>-<ver>
+    r"    (?P<name>[^\s-]+?)                  "  # <name>
+    r"    - (?P<ver>[^\s-]*?)                 "  # "-" <ver>
+    r"  )                                     "  # close "namever" group
+    r"  ( - (?P<build>\d[^-]*?) )?            "  # optional "-" <build>
+    r"  - (?P<pyver>[^\s-]+?)                 "  # "-" <pyver> tag
+    r"  - (?P<abi>[^\s-]+?)                   "  # "-" <abi> tag
+    r"  - (?P<plat>[^\s-]+?)                  "  # "-" <plat> tag
+    r")                                       "  # end of <base_wheel_name> group
+    r"( - (?P<variant_hash>                   "  # optional <variant_hash>
+    rf"    [0-9a-f]{{{VARIANT_LABEL_LENGTH}}} "
+    r"    )                                   "
+    r")?                                      "
+    r"\.whl                                   "  # ".whl" suffix
+    r"                                        ",
     re.VERBOSE,
 )
 
