@@ -369,7 +369,7 @@ class Metadata:
     license_files = ()
     dynamic = ()
 
-    variant_hash: Optional[str] = None
+    variant_label: Optional[str] = None
     variant_properties: list[str] = []
     variant_plugins: dict[str, dict[str, Union[list[str],str]]] = {}
     variant_default_priorities: dict[str, Any] = {
@@ -475,7 +475,7 @@ class Metadata:
     def write_variants_json_file(self, fp):
         """Write out Variant Metadata in json format"""
 
-        if self.variant_hash is not None:
+        if self.variant_label is not None:
             data = {
                 VARIANTS_JSON_SCHEMA_KEY: VARIANTS_JSON_SCHEMA_URL,
                 VARIANT_INFO_DEFAULT_PRIO_KEY: {},
@@ -522,13 +522,13 @@ class Metadata:
                 match = VALIDATION_PROPERTY_REGEX.match(vprop_str)
                 if not match:
                     raise ValueError(
-                        f"Invalid variant property '{vprop_str}' in variant {self.variant_hash}"
+                        f"Invalid variant property '{vprop_str}' in variant {self.variant_label}"
                     )
                 namespace = match.group('namespace')
                 feature = match.group('feature')
                 value = match.group('value')
                 variant_data[namespace][feature].add(value)
-            data[VARIANTS_JSON_VARIANT_DATA_KEY][self.variant_hash] = variant_data
+            data[VARIANTS_JSON_VARIANT_DATA_KEY][self.variant_label] = variant_data
 
             def preprocess(data):
                 """Preprocess the data to ensure it is JSON serializable."""

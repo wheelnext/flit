@@ -26,7 +26,7 @@ from ._spdx_data import licenses
 from .common import normalise_core_metadata_name
 from .versionno import normalise_version
 
-from .variant_constants import VARIANT_LABEL_LENGTH
+VARIANT_HASH_LEN = 8
 
 log = logging.getLogger(__name__)
 
@@ -309,7 +309,7 @@ class VariantProviderConfig:
 
 @dataclass
 class VariantConfig:
-    vhash: str
+    vlabel: str
     properties: list[str]
     default_priorities: dict[str, list[str]]
     providers: dict[str, VariantProviderConfig]
@@ -321,12 +321,12 @@ class VariantConfig:
         data = data.copy()
 
         if vprops is None:
-            data["vhash"] = None
+            data["vlabel"] = None
             data["properties"] = None
 
 
         elif len(vprops) == 0:
-            data["vhash"] = "null"
+            data["vlabel"] = "null"
             data["properties"] = []
 
         else:
@@ -343,10 +343,10 @@ class VariantConfig:
             hash_object = hashlib.sha256()
             for vprop in data["properties"]:
                 hash_object.update(f"{vprop}\n".encode())
-            data["vhash"] = hash_object.hexdigest()[:VARIANT_LABEL_LENGTH]
+            data["vlabel"] = hash_object.hexdigest()[:VARIANT_HASH_LEN]
 
         if variant_label is not None:
-            data["vhash"] = variant_label
+            data["vlabel"] = variant_label
 
         # Convert hyphenated keys to underscored keys
         data = {key.replace("-", "_"): value for key, value in data.items()}
@@ -374,7 +374,7 @@ class VariantConfig:
     def to_variant_cfg_dict(self) -> dict[str, Any]:
         """Converts the VariantConfig instance to a metadata dictionary."""
         return {
-            "variant_hash": self.vhash,
+            "variant_label": self.vlabel,
             "variant_properties": self.properties,
             "variant_plugins": {
                 namespace: {

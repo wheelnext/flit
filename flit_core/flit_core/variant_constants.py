@@ -93,7 +93,7 @@ VALIDATION_WHEEL_NAME_REGEX = re.compile(
     r"  - (?P<abi>[^\s-]+?)                   "  # "-" <abi> tag
     r"  - (?P<plat>[^\s-]+?)                  "  # "-" <plat> tag
     r")                                       "  # end of <base_wheel_name> group
-    r"( - (?P<variant_hash>                   "  # optional <variant_hash>
+    r"( - (?P<variant_label>                   "  # optional <variant_label>
     rf"    [0-9a-f]{{{VARIANT_LABEL_LENGTH}}} "
     r"    )                                   "
     r")?                                      "

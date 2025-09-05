@@ -100,10 +100,10 @@ class WheelBuilder:
     def wheel_filename(self):
         dist_name = common.normalize_dist_name(self.metadata.name, self.metadata.version)
         tag = ('py2.' if self.metadata.supports_py2 else '') + 'py3-none-any'
-        if self.metadata.variant_hash is None:
+        if self.metadata.variant_label is None:
             return '{}-{}.whl'.format(dist_name, tag)
         else:
-            return '{}-{}-{}.whl'.format(dist_name, tag, self.metadata.variant_hash)
+            return '{}-{}-{}.whl'.format(dist_name, tag, self.metadata.variant_label)
 
     def _add_file(self, full_path, rel_path):
         log.debug("Adding %s to zip file", full_path)
@@ -197,7 +197,7 @@ class WheelBuilder:
         with self._write_to_zip(self.dist_info + '/METADATA') as f:
             self.metadata.write_metadata_file(f)
 
-        if self.metadata.variant_hash is not None:
+        if self.metadata.variant_label is not None:
             with self._write_to_zip(self.dist_info + f'/{VARIANT_DIST_INFO_FILENAME}') as f:
                 self.metadata.write_variants_json_file(f)
 
