@@ -25,7 +25,7 @@ VARIANT_INFO_PROVIDER_REQUIRES_KEY: Literal["requires"] = "requires"
 PYPROJECT_TOML_TOP_KEY = "variant"
 
 VARIANTS_JSON_SCHEMA_KEY: Literal["$schema"] = "$schema"
-VARIANTS_JSON_SCHEMA_URL = "https://variants-schema.wheelnext.dev/"
+VARIANTS_JSON_SCHEMA_URL = "https://variants-schema.wheelnext.dev/v0.0.2.json"
 VARIANTS_JSON_VARIANT_DATA_KEY: Literal["variants"] = "variants"
 
 VALIDATION_VARIANT_HASH_REGEX = re.compile(rf"[0-9a-f]{{{VARIANT_LABEL_LENGTH}}}")
