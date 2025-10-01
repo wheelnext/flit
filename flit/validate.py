@@ -190,7 +190,8 @@ MARKER_VARS = {
     'python_version', 'python_full_version', 'os_name', 'sys_platform',
     'platform_release', 'platform_system', 'platform_version', 'platform_machine',
     'platform_python_implementation', 'implementation_name',
-    'implementation_version', 'extra',
+    'implementation_version', 'extra', 'variant_namespaces', 'variant_features', 
+    'variant_properties', 'variant_label'
 }
 
 def validate_environment_marker(em):
