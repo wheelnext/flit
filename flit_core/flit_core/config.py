@@ -143,7 +143,7 @@ def prep_toml_config(d, path, vprops: Optional[list[str]],
             "Neither [project] nor [tool.flit.metadata] found in pyproject.toml"
         )
 
-    if dvariant:
+    if variant_label is not None:
         loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops,
                                                             variant_label=variant_label)
         loaded_cfg.variant_config.validate()
@@ -320,6 +320,8 @@ class VariantConfig:
         """Creates an instance of VariantConfig from a dictionary."""
         data = data.copy()
 
+        data.setdefault("default_priorities", {})
+
         if vprops is None:
             data["vlabel"] = None
             data["properties"] = None
@@ -354,15 +356,17 @@ class VariantConfig:
         # Convert providers to VariantProviderConfig instances
         data["providers"] = {
             provider: VariantProviderConfig.from_dict(provider_data)
-            for provider, provider_data in data["providers"].items()
+            for provider, provider_data in data.get("providers", {}).items()
         }
+
+        data.setdefault("default_priorities", {})
 
         # Create an instance of VariantConfig
         return cls(**data)
 
     def validate(self):
         """Validates the VariantConfig instance."""
-        for namespace in self.default_priorities["namespace"]:
+        for namespace in self.default_priorities.get("namespace", []):
             if namespace not in self.providers:
                 raise ValueError(
                     f"Namespace '{namespace}' is not defined in the variant providers"

@@ -227,7 +227,7 @@ def main(argv=None):
             main(args.ini_file, formats=set(args.format or []),
                  gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(),
                  vprops=args.vprops if not args.null_variant else [],
-                 variant_label=args.variant_label)
+                 variant_label=args.variant_label if not args.null_variant else "null")
         except(common.NoDocstringError, common.VCSError, common.NoVersionError) as e:
             sys.exit(e.args[0])
 
