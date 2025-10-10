@@ -26,7 +26,8 @@ from .variant_constants import (
     VARIANT_INFO_PROVIDER_OPTIONAL_KEY,
     VARIANT_INFO_PROVIDER_PLUGIN_API_KEY,
     VARIANT_INFO_PROVIDER_ENABLE_IF_KEY,
-    VARIANT_INFO_PROVIDER_REQUIRES_KEY
+    VARIANT_INFO_PROVIDER_REQUIRES_KEY,
+    VARIANT_INFO_PROVIDER_PLUGIN_USE_KEY
 )
 from .versionno import normalise_version
 
@@ -512,6 +513,9 @@ class Metadata:
 
                 if (plugin_api := plugin_conf.get("plugin_api", None)) is not None:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
+
+                if (plugin_use := plugin_conf.get("plugin_use", None)) is not None:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_USE_KEY] = plugin_use
 
             data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
 

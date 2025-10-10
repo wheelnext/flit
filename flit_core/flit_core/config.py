@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from flit_core.variant_constants import VARIANT_INFO_DEFAULT_PRIO_KEY
+
 import hashlib
 
 try:
@@ -291,6 +293,7 @@ class VariantProviderConfig:
     plugin_api: Optional[str] = None
     enable_if: Optional[str] = None
     optional: bool = False
+    plugin_use: Optional[str] = "all"
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -303,8 +306,8 @@ class VariantProviderConfig:
 
     def validate(self):
         """Validates the VariantProviderConfig instance."""
-        if not self.requires:
-            raise ValueError("Requires list cannot be empty")
+        if not self.requires and self.plugin_use != "none":
+            raise ValueError("Requires list cannot be empty with not `none-plugin`")
 
 
 @dataclass
@@ -319,8 +322,6 @@ class VariantConfig:
                   variant_label: Optional[str]):
         """Creates an instance of VariantConfig from a dictionary."""
         data = data.copy()
-
-        data.setdefault("default_priorities", {})
 
         if vprops is None:
             data["vlabel"] = None
@@ -359,7 +360,7 @@ class VariantConfig:
             for provider, provider_data in data.get("providers", {}).items()
         }
 
-        data.setdefault("default_priorities", {})
+        data.setdefault(VARIANT_INFO_DEFAULT_PRIO_KEY.replace("-", "_"), {})
 
         # Create an instance of VariantConfig
         return cls(**data)
@@ -382,10 +383,11 @@ class VariantConfig:
             "variant_properties": self.properties,
             "variant_plugins": {
                 namespace: {
-                    "requires": provider_cfg.requires,
-                    "plugin_api": provider_cfg.plugin_api,
                     "enable_if": provider_cfg.enable_if,
                     "optional": provider_cfg.optional,
+                    "plugin_api": provider_cfg.plugin_api,
+                    "plugin_use": provider_cfg.plugin_use,
+                    "requires": provider_cfg.requires,
                 }
                 for namespace, provider_cfg in self.providers.items()
             },
