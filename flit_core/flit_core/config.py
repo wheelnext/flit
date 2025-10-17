@@ -7,10 +7,13 @@ import os.path as osp
 from pathlib import Path
 from contextlib import suppress
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from flit_core.variant_constants import VARIANT_INFO_DEFAULT_PRIO_KEY
+from flit_core.variant_constants import (
+    VARIANT_INFO_DEFAULT_PRIO_KEY, 
+    VARIANT_INFO_STATIC_PROPERTIES_KEY
+)
 
 import hashlib
 
@@ -146,8 +149,11 @@ def prep_toml_config(d, path, vprops: Optional[list[str]],
         )
 
     if variant_label is not None:
-        loaded_cfg.variant_config = VariantConfig.from_dict(dvariant, vprops=vprops,
-                                                            variant_label=variant_label)
+        loaded_cfg.variant_config = VariantConfig.from_dict(
+            dvariant, 
+            vprops=vprops,
+            variant_label=variant_label
+        )
         loaded_cfg.variant_config.validate()
 
     unknown_sections = set(dtool) - {
@@ -289,11 +295,11 @@ class LoadedConfig:
 
 @dataclass
 class VariantProviderConfig:
-    requires: list[str]
-    plugin_api: Optional[str] = None
     enable_if: Optional[str] = None
+    install_time: bool = True
     optional: bool = False
-    plugin_use: Optional[str] = "all"
+    plugin_api: Optional[str] = None
+    requires: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -306,29 +312,38 @@ class VariantProviderConfig:
 
     def validate(self):
         """Validates the VariantProviderConfig instance."""
-        if not self.requires and self.plugin_use != "none":
-            raise ValueError("Requires list cannot be empty with not `none-plugin`")
+        if not self.requires and self.install_time:
+            raise ValueError("Requires list cannot be empty for `install-time` provider plugin`")
 
 
 @dataclass
 class VariantConfig:
-    vlabel: str
-    properties: list[str]
-    default_priorities: dict[str, list[str]]
-    providers: dict[str, VariantProviderConfig]
+    vlabel: Optional[str] = None
+    properties: Optional[list[str]] = None
+    providers: dict[str, VariantProviderConfig] = field(default_factory=dict)
+    default_priorities: dict[str, list[str]] = field(default_factory=dict)
+    static_properties: dict[str, list[str]] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict, vprops: Optional[list[str]],
+    def from_dict(cls, data: dict[str, Any], vprops: Optional[list[str]],
                   variant_label: Optional[str]):
         """Creates an instance of VariantConfig from a dictionary."""
-        data = data.copy()
 
         if vprops is None:
-            data["vlabel"] = None
-            data["properties"] = None
+            return cls()
+        
+        data = data.copy()
 
+        # Convert hyphenated keys to underscored keys
+        data = {key.replace("-", "_"): value for key, value in data.items()}
+        data.setdefault(VARIANT_INFO_DEFAULT_PRIO_KEY.replace("-", "_"), {})
+        data.setdefault(VARIANT_INFO_STATIC_PROPERTIES_KEY.replace("-", "_"), {})
 
-        elif len(vprops) == 0:
+        if variant_label is not None:
+            data["vlabel"] = variant_label
+
+        if len(vprops) == 0:
+            # A null-variant
             data["vlabel"] = "null"
             data["properties"] = []
 
@@ -343,24 +358,11 @@ class VariantConfig:
 
             data["properties"] = [" :: ".join(vprop) for vprop in sorted(_vprops)]
 
-            hash_object = hashlib.sha256()
-            for vprop in data["properties"]:
-                hash_object.update(f"{vprop}\n".encode())
-            data["vlabel"] = hash_object.hexdigest()[:VARIANT_HASH_LEN]
-
-        if variant_label is not None:
-            data["vlabel"] = variant_label
-
-        # Convert hyphenated keys to underscored keys
-        data = {key.replace("-", "_"): value for key, value in data.items()}
-
         # Convert providers to VariantProviderConfig instances
         data["providers"] = {
             provider: VariantProviderConfig.from_dict(provider_data)
             for provider, provider_data in data.get("providers", {}).items()
         }
-
-        data.setdefault(VARIANT_INFO_DEFAULT_PRIO_KEY.replace("-", "_"), {})
 
         # Create an instance of VariantConfig
         return cls(**data)
@@ -386,7 +388,7 @@ class VariantConfig:
                     "enable_if": provider_cfg.enable_if,
                     "optional": provider_cfg.optional,
                     "plugin_api": provider_cfg.plugin_api,
-                    "plugin_use": provider_cfg.plugin_use,
+                    "install_time": provider_cfg.install_time,
                     "requires": provider_cfg.requires,
                 }
                 for namespace, provider_cfg in self.providers.items()
@@ -395,8 +397,11 @@ class VariantConfig:
                 "namespace": self.default_priorities.get("namespace", []),
                 "feature": self.default_priorities.get("feature", {}),
                 "property": self.default_priorities.get("property", {})
-            }
+            },
+            "variant_static_properties": self.static_properties
         }
+
+        
 
 
 readme_ext_to_content_type = {

@@ -27,7 +27,8 @@ from .variant_constants import (
     VARIANT_INFO_PROVIDER_PLUGIN_API_KEY,
     VARIANT_INFO_PROVIDER_ENABLE_IF_KEY,
     VARIANT_INFO_PROVIDER_REQUIRES_KEY,
-    VARIANT_INFO_PROVIDER_PLUGIN_USE_KEY
+    VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY,
+    VARIANT_INFO_STATIC_PROPERTIES_KEY
 )
 from .versionno import normalise_version
 
@@ -378,6 +379,7 @@ class Metadata:
         "feature": {},
         "property": {}
     }
+    variant_static_properties: dict[str, list[str]] = {}
 
     metadata_version = "2.4"
 
@@ -481,23 +483,45 @@ class Metadata:
                 VARIANTS_JSON_SCHEMA_KEY: VARIANTS_JSON_SCHEMA_URL,
                 VARIANT_INFO_DEFAULT_PRIO_KEY: {},
                 VARIANT_INFO_PROVIDER_DATA_KEY: {},
+                VARIANT_INFO_STATIC_PROPERTIES_KEY: {},
                 VARIANTS_JSON_VARIANT_DATA_KEY: {}
             }
 
             # ==================== VARIANT_INFO_DEFAULT_PRIO_KEY ==================== #
 
-            if (ns_prio := self.variant_default_priorities["namespace"]):
+            if (ns_prio := self.variant_default_priorities[VARIANT_INFO_NAMESPACE_KEY]):
                 data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY] = ns_prio
 
-            if (feat_prio := self.variant_default_priorities["feature"]):
+            if (feat_prio := self.variant_default_priorities[VARIANT_INFO_FEATURE_KEY]):
                 data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_FEATURE_KEY] = feat_prio
 
-            if (prop_prio := self.variant_default_priorities["property"]):
+            if (prop_prio := self.variant_default_priorities[VARIANT_INFO_PROPERTY_KEY]):
                 data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_PROPERTY_KEY] = prop_prio
 
             if not data[VARIANT_INFO_DEFAULT_PRIO_KEY]:
                 # If no default priorities are set, remove the key
                 del data[VARIANT_INFO_DEFAULT_PRIO_KEY]
+
+            # ==================== VARIANT_INFO_STATIC_PROPERTIES_KEY ==================== #
+
+            if self.variant_static_properties:
+                data[VARIANT_INFO_STATIC_PROPERTIES_KEY] = self.variant_static_properties
+
+            if not data[VARIANT_INFO_STATIC_PROPERTIES_KEY]:
+                # If no default priorities are set, remove the key
+                del data[VARIANT_INFO_STATIC_PROPERTIES_KEY]
+
+            else:
+                if not isinstance(data[VARIANT_INFO_STATIC_PROPERTIES_KEY], dict):
+                    raise TypeError(f"Unexpected type received for {data[VARIANT_INFO_STATIC_PROPERTIES_KEY]=}")
+
+                # Validation
+                for namespace in data[VARIANT_INFO_STATIC_PROPERTIES_KEY]:
+                    if namespace not in data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY]:
+                        raise ValueError(
+                            f"The static namespace `{namespace}` is not listed in the namespace priorities: "
+                            f"{data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY]}"
+                        )
 
             # ==================== VARIANT_INFO_PROVIDER_DATA_KEY ==================== #
 
@@ -514,8 +538,9 @@ class Metadata:
                 if (plugin_api := plugin_conf.get("plugin_api", None)) is not None:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
 
-                if (plugin_use := plugin_conf.get("plugin_use", None)) is not None:
-                    variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_USE_KEY] = plugin_use
+                if not isinstance(install_time := plugin_conf.get("install_time", True), bool):
+                    raise TypeError(f"Unexpected type received for {type(install_time)=}")
+                variant_providers[ns][VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY] = install_time
 
             data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
 

@@ -16,15 +16,16 @@ VARIANT_INFO_NAMESPACE_KEY: Literal["namespace"] = "namespace"
 VARIANT_INFO_PROPERTY_KEY: Literal["property"] = "property"
 VARIANT_INFO_PROVIDER_DATA_KEY: Literal["providers"] = "providers"
 VARIANT_INFO_PROVIDER_ENABLE_IF_KEY: Literal["enable-if"] = "enable-if"
+VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY: Literal["install-time"] = "install-time"
 VARIANT_INFO_PROVIDER_OPTIONAL_KEY: Literal["optional"] = "optional"
 VARIANT_INFO_PROVIDER_PLUGIN_API_KEY: Literal["plugin-api"] = "plugin-api"
-VARIANT_INFO_PROVIDER_PLUGIN_USE_KEY: Literal["plugin-use"] = "plugin-use"
 VARIANT_INFO_PROVIDER_REQUIRES_KEY: Literal["requires"] = "requires"
+VARIANT_INFO_STATIC_PROPERTIES_KEY: Literal["static-properties"] = "static-properties"
 
 PYPROJECT_TOML_TOP_KEY = "variant"
 
 VARIANTS_JSON_SCHEMA_KEY: Literal["$schema"] = "$schema"
-VARIANTS_JSON_SCHEMA_URL = "https://variants-schema.wheelnext.dev/v0.0.2.json"
+VARIANTS_JSON_SCHEMA_URL = "https://variants-schema.wheelnext.dev/v0.0.3.json"
 VARIANTS_JSON_VARIANT_DATA_KEY: Literal["variants"] = "variants"
 
 VALIDATION_VARIANT_LABEL_REGEX = re.compile(rf"[0-9a-z._]{{1,{VARIANT_LABEL_LENGTH}}}")
@@ -111,11 +112,11 @@ class PriorityJsonDict(TypedDict, total=False):
 ProviderPluginJsonDict = TypedDict(
     "ProviderPluginJsonDict",
     {
+        "enable-if": str,
+        "install-time": bool,
+        "optional": bool,
         "plugin-api": str,
         "requires": list[str],
-        "enable-if": str,
-        "optional": bool,
-        "plugin-use": Literal["all", "build", "none"],
     },
     total=False,
 )
@@ -129,6 +130,7 @@ VariantsJsonDict = TypedDict(
         "$schema": str,
         "default-priorities": PriorityJsonDict,
         "providers": dict[str, ProviderPluginJsonDict],
+        "static-properties": dict[str, dict[str, list[str]]],
         "variants": dict[str, VariantInfoJsonDict],
     },
     total=False,
