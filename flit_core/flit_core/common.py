@@ -527,8 +527,6 @@ class Metadata:
 
             variant_providers = defaultdict(dict)
             for ns, plugin_conf in self.variant_plugins.items():
-                variant_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = plugin_conf.get("requires", [])
-
                 if (enable_if := plugin_conf.get("enable_if", None)) is not None:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_ENABLE_IF_KEY] = enable_if
 
@@ -540,8 +538,16 @@ class Metadata:
 
                 if not isinstance(install_time := plugin_conf.get("install_time", True), bool):
                     raise TypeError(f"Unexpected type received for {type(install_time)=}")
+
                 if not install_time:
                     variant_providers[ns][VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY] = install_time
+
+                requires_list = plugin_conf.get("requires", [])
+                if install_time and not requires_list:
+                    raise ValueError("A non-empty list of requirements is required for install-time providers")
+
+                if requires_list:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = requires_list
 
             data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
 

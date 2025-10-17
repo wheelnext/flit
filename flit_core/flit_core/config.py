@@ -12,7 +12,8 @@ from typing import Any, Optional
 
 from flit_core.variant_constants import (
     VARIANT_INFO_DEFAULT_PRIO_KEY, 
-    VARIANT_INFO_STATIC_PROPERTIES_KEY
+    VARIANT_INFO_STATIC_PROPERTIES_KEY, 
+    VALIDATION_VARIANT_LABEL_REGEX
 )
 
 import hashlib
@@ -340,6 +341,11 @@ class VariantConfig:
         data.setdefault(VARIANT_INFO_STATIC_PROPERTIES_KEY.replace("-", "_"), {})
 
         if variant_label is not None:
+            if not VALIDATION_VARIANT_LABEL_REGEX.fullmatch(variant_label):
+                raise ValueError(
+                    f"The {variant_label=} received does not comply with the expected regex: "
+                    f"{VALIDATION_VARIANT_LABEL_REGEX.pattern}"
+                )
             data["vlabel"] = variant_label
 
         if len(vprops) == 0:
