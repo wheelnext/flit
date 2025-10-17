@@ -540,7 +540,8 @@ class Metadata:
 
                 if not isinstance(install_time := plugin_conf.get("install_time", True), bool):
                     raise TypeError(f"Unexpected type received for {type(install_time)=}")
-                variant_providers[ns][VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY] = install_time
+                if not install_time:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY] = install_time
 
             data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
 
