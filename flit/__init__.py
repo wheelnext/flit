@@ -12,7 +12,7 @@ from flit_core import common
 from .config import ConfigError
 from .log import enable_colourful_output
 
-__version__ = '3.12.0'
+__version__ = '3.12.0+wheelnext'
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +81,33 @@ def add_shared_install_options(parser: argparse.ArgumentParser):
 def add_shared_build_options(parser: argparse.ArgumentParser):
     parser.add_argument('--format', action='append',
         help="Select a format to publish. Options: 'wheel', 'sdist'"
+    )
+
+    group = parser.add_mutually_exclusive_group(required=False)
+
+    group.add_argument(
+        "-p",
+        "--variant-property",
+        dest="vprops",
+        type=str,
+        action="extend",
+        nargs="+",
+        help=(
+            "Variant Properties to add to the Wheel Variant, can be repeated as many "
+            "times as needed"
+        ),
+        default=None,
+    )
+
+    group.add_argument(
+        "--null-variant",
+        action="store_true",
+        help="make the variant a `null variant` - no variant property.",
+    )
+
+    parser.add_argument(
+        "--variant-label",
+        help="Use a custom variant label (the default is variant hash)",
     )
 
     setup_py_grp = parser.add_mutually_exclusive_group()
@@ -198,9 +225,12 @@ def main(argv=None):
         from .build import main
         try:
             main(args.ini_file, formats=set(args.format or []),
-                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs())
+                 gen_setup_py=gen_setup_py(), use_vcs=sdist_use_vcs(),
+                 vprops=args.vprops if not args.null_variant else [],
+                 variant_label=args.variant_label if not args.null_variant else "null")
         except(common.NoDocstringError, common.VCSError, common.NoVersionError) as e:
             sys.exit(e.args[0])
+
     elif args.subcmd == 'publish':
         if args.deprecated_repository:
             log.warning("Passing --repository before the 'upload' subcommand is deprecated: pass it after")

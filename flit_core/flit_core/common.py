@@ -1,15 +1,35 @@
 import ast
 from contextlib import contextmanager
+from collections import defaultdict
 import hashlib
 import logging
 import os
 import sys
+import json
+from typing import Any, Optional, Union
 
 from pathlib import Path
 import re
 
 log = logging.getLogger(__name__)
 
+from .variant_constants import (
+    VALIDATION_PROPERTY_REGEX,
+    VARIANTS_JSON_SCHEMA_KEY,
+    VARIANTS_JSON_SCHEMA_URL,
+    VARIANTS_JSON_VARIANT_DATA_KEY,
+    VARIANT_INFO_DEFAULT_PRIO_KEY,
+    VARIANT_INFO_FEATURE_KEY,
+    VARIANT_INFO_NAMESPACE_KEY,
+    VARIANT_INFO_PROPERTY_KEY,
+    VARIANT_INFO_PROVIDER_DATA_KEY,
+    VARIANT_INFO_PROVIDER_OPTIONAL_KEY,
+    VARIANT_INFO_PROVIDER_PLUGIN_API_KEY,
+    VARIANT_INFO_PROVIDER_ENABLE_IF_KEY,
+    VARIANT_INFO_PROVIDER_REQUIRES_KEY,
+    VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY,
+    VARIANT_INFO_STATIC_PROPERTIES_KEY
+)
 from .versionno import normalise_version
 
 class Module:
@@ -351,6 +371,16 @@ class Metadata:
     license_files = ()
     dynamic = ()
 
+    variant_label: Optional[str] = None
+    variant_properties: list[str] = []
+    variant_plugins: dict[str, dict[str, Union[list[str],str]]] = {}
+    variant_default_priorities: dict[str, Any] = {
+        "namespace": [],
+        "feature": {},
+        "property": {}
+    }
+    variant_static_properties: dict[str, list[str]] = {}
+
     metadata_version = "2.4"
 
     def __init__(self, data):
@@ -444,6 +474,111 @@ class Metadata:
         if self.description is not None:
             fp.write('\n' + self.description + '\n')
 
+
+    def write_variants_json_file(self, fp):
+        """Write out Variant Metadata in json format"""
+
+        if self.variant_label is not None:
+            data = {
+                VARIANTS_JSON_SCHEMA_KEY: VARIANTS_JSON_SCHEMA_URL,
+                VARIANT_INFO_DEFAULT_PRIO_KEY: {},
+                VARIANT_INFO_PROVIDER_DATA_KEY: {},
+                VARIANT_INFO_STATIC_PROPERTIES_KEY: {},
+                VARIANTS_JSON_VARIANT_DATA_KEY: {}
+            }
+
+            # ==================== VARIANT_INFO_DEFAULT_PRIO_KEY ==================== #
+
+            if (ns_prio := self.variant_default_priorities[VARIANT_INFO_NAMESPACE_KEY]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY] = ns_prio
+
+            if (feat_prio := self.variant_default_priorities[VARIANT_INFO_FEATURE_KEY]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_FEATURE_KEY] = feat_prio
+
+            if (prop_prio := self.variant_default_priorities[VARIANT_INFO_PROPERTY_KEY]):
+                data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_PROPERTY_KEY] = prop_prio
+
+            if not data[VARIANT_INFO_DEFAULT_PRIO_KEY]:
+                # If no default priorities are set, remove the key
+                del data[VARIANT_INFO_DEFAULT_PRIO_KEY]
+
+            # ==================== VARIANT_INFO_STATIC_PROPERTIES_KEY ==================== #
+
+            if self.variant_static_properties:
+                data[VARIANT_INFO_STATIC_PROPERTIES_KEY] = self.variant_static_properties
+
+            if not data[VARIANT_INFO_STATIC_PROPERTIES_KEY]:
+                # If no default priorities are set, remove the key
+                del data[VARIANT_INFO_STATIC_PROPERTIES_KEY]
+
+            else:
+                if not isinstance(data[VARIANT_INFO_STATIC_PROPERTIES_KEY], dict):
+                    raise TypeError(f"Unexpected type received for {data[VARIANT_INFO_STATIC_PROPERTIES_KEY]=}")
+
+                # Validation
+                for namespace in data[VARIANT_INFO_STATIC_PROPERTIES_KEY]:
+                    if namespace not in data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY]:
+                        raise ValueError(
+                            f"The static namespace `{namespace}` is not listed in the namespace priorities: "
+                            f"{data[VARIANT_INFO_DEFAULT_PRIO_KEY][VARIANT_INFO_NAMESPACE_KEY]}"
+                        )
+
+            # ==================== VARIANT_INFO_PROVIDER_DATA_KEY ==================== #
+
+            variant_providers = defaultdict(dict)
+            for ns, plugin_conf in self.variant_plugins.items():
+                if (enable_if := plugin_conf.get("enable_if", None)) is not None:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_ENABLE_IF_KEY] = enable_if
+
+                if plugin_conf.get("optional", False):
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_OPTIONAL_KEY] = True
+
+                if (plugin_api := plugin_conf.get("plugin_api", None)) is not None:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_PLUGIN_API_KEY] = plugin_api
+
+                if not isinstance(install_time := plugin_conf.get("install_time", True), bool):
+                    raise TypeError(f"Unexpected type received for {type(install_time)=}")
+
+                if not install_time:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_INSTALL_TIME_KEY] = install_time
+
+                requires_list = plugin_conf.get("requires", [])
+                if install_time and not requires_list:
+                    raise ValueError("A non-empty list of requirements is required for install-time providers")
+
+                if requires_list:
+                    variant_providers[ns][VARIANT_INFO_PROVIDER_REQUIRES_KEY] = requires_list
+
+            data[VARIANT_INFO_PROVIDER_DATA_KEY] = variant_providers
+
+            # ==================== VARIANTS_JSON_VARIANT_DATA_KEY ==================== #
+
+            variant_data = defaultdict(lambda: defaultdict(set))
+            for vprop_str in self.variant_properties:
+                match = VALIDATION_PROPERTY_REGEX.match(vprop_str)
+                if not match:
+                    raise ValueError(
+                        f"Invalid variant property '{vprop_str}' in variant {self.variant_label}"
+                    )
+                namespace = match.group('namespace')
+                feature = match.group('feature')
+                value = match.group('value')
+                variant_data[namespace][feature].add(value)
+            data[VARIANTS_JSON_VARIANT_DATA_KEY][self.variant_label] = variant_data
+
+            def preprocess(data):
+                """Preprocess the data to ensure it is JSON serializable."""
+                if isinstance(data, (defaultdict, dict)):
+                    return {k: preprocess(v) for k, v in data.items()}
+                if isinstance(data, set):
+                    return list(data)
+                return data
+
+            json.dump(
+                preprocess(data), fp, indent=4, sort_keys=True, ensure_ascii=False
+            )
+
+
     @property
     def supports_py2(self):
         """Return True if Requires-Python indicates Python 2 support."""
@@ -457,6 +592,9 @@ def make_metadata(module, ini_info):
     md_dict = {'name': module.name, 'provides': [module.name]}
     md_dict.update(get_info_from_module(module, ini_info.dynamic_metadata))
     md_dict.update(ini_info.metadata)
+    vconfig = getattr(ini_info, "variant_config", None)
+    if vconfig is not None:
+        md_dict.update(vconfig.to_variant_cfg_dict())
     return Metadata(md_dict)
 
 

@@ -5,7 +5,18 @@ import logging
 import os
 import os.path as osp
 from pathlib import Path
+from contextlib import suppress
 import re
+from dataclasses import dataclass, field
+from typing import Any, Optional
+
+from flit_core.variant_constants import (
+    VARIANT_INFO_DEFAULT_PRIO_KEY, 
+    VARIANT_INFO_STATIC_PROPERTIES_KEY, 
+    VALIDATION_VARIANT_LABEL_REGEX
+)
+
+import hashlib
 
 try:
     import tomllib
@@ -21,8 +32,9 @@ from ._spdx_data import licenses
 from .common import normalise_core_metadata_name
 from .versionno import normalise_version
 
-log = logging.getLogger(__name__)
+VARIANT_HASH_LEN = 8
 
+log = logging.getLogger(__name__)
 
 class ConfigError(ValueError):
     pass
@@ -78,11 +90,12 @@ default_license_files_globs = ['COPYING*', 'LICEN[CS]E*']
 license_files_allowed_chars = re.compile(r'^[\w\-\.\/\*\?\[\]]+$')
 
 
-def read_flit_config(path):
+def read_flit_config(path, vprops: Optional[list[str]] = None,
+                     variant_label: Optional[str] = None):
     """Read and check the `pyproject.toml` file with data about the package.
     """
     d = tomllib.loads(path.read_text('utf-8'))
-    return prep_toml_config(d, path)
+    return prep_toml_config(d, path, vprops=vprops, variant_label=variant_label)
 
 
 class EntryPointsConflict(ConfigError):
@@ -90,12 +103,14 @@ class EntryPointsConflict(ConfigError):
         return ('Please specify console_scripts entry points, or [scripts] in '
             'flit config, not both.')
 
-def prep_toml_config(d, path):
+def prep_toml_config(d, path, vprops: Optional[list[str]],
+                     variant_label: Optional[str] = None):
     """Validate config loaded from pyproject.toml and prepare common metadata
 
     Returns a LoadedConfig object.
     """
     dtool = d.get('tool', {}).get('flit', {})
+    dvariant = d.get('variant', {})
 
     if 'project' in d:
         # Metadata in [project] table (PEP 621)
@@ -133,6 +148,14 @@ def prep_toml_config(d, path):
         raise ConfigError(
             "Neither [project] nor [tool.flit.metadata] found in pyproject.toml"
         )
+
+    if variant_label is not None:
+        loaded_cfg.variant_config = VariantConfig.from_dict(
+            dvariant, 
+            vprops=vprops,
+            variant_label=variant_label
+        )
+        loaded_cfg.variant_config.validate()
 
     unknown_sections = set(dtool) - {
         'metadata', 'module', 'scripts', 'entrypoints', 'sdist', 'external-data'
@@ -262,6 +285,7 @@ class LoadedConfig:
         self.sdist_exclude_patterns = []
         self.dynamic_metadata = []
         self.data_directory = None
+        self.variant_config: Optional[VariantConfig] = None
 
     def add_scripts(self, scripts_dict):
         if scripts_dict:
@@ -269,6 +293,122 @@ class LoadedConfig:
                 raise EntryPointsConflict
             else:
                 self.entrypoints['console_scripts'] = scripts_dict
+
+@dataclass
+class VariantProviderConfig:
+    enable_if: Optional[str] = None
+    install_time: bool = True
+    optional: bool = False
+    plugin_api: Optional[str] = None
+    requires: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Creates an instance of VariantProviderConfig from a dictionary."""
+        # Convert hyphenated keys to underscored keys
+        data = {key.replace("-", "_"): value for key, value in data.items()}
+
+        # Create an instance of VariantProviderConfig
+        return cls(**data)
+
+    def validate(self):
+        """Validates the VariantProviderConfig instance."""
+        if not self.requires and self.install_time:
+            raise ValueError("Requires list cannot be empty for `install-time` provider plugin`")
+
+
+@dataclass
+class VariantConfig:
+    vlabel: Optional[str] = None
+    properties: Optional[list[str]] = None
+    providers: dict[str, VariantProviderConfig] = field(default_factory=dict)
+    default_priorities: dict[str, list[str]] = field(default_factory=dict)
+    static_properties: dict[str, list[str]] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], vprops: Optional[list[str]],
+                  variant_label: Optional[str]):
+        """Creates an instance of VariantConfig from a dictionary."""
+
+        if vprops is None:
+            return cls()
+        
+        data = data.copy()
+
+        # Convert hyphenated keys to underscored keys
+        data = {key.replace("-", "_"): value for key, value in data.items()}
+        data.setdefault(VARIANT_INFO_DEFAULT_PRIO_KEY.replace("-", "_"), {})
+        data.setdefault(VARIANT_INFO_STATIC_PROPERTIES_KEY.replace("-", "_"), {})
+
+        if variant_label is not None:
+            if not VALIDATION_VARIANT_LABEL_REGEX.fullmatch(variant_label):
+                raise ValueError(
+                    f"The {variant_label=} received does not comply with the expected regex: "
+                    f"{VALIDATION_VARIANT_LABEL_REGEX.pattern}"
+                )
+            data["vlabel"] = variant_label
+
+        if len(vprops) == 0:
+            # A null-variant
+            data["vlabel"] = "null"
+            data["properties"] = []
+
+        else:
+            # Normalizing
+            _vprops = [
+                [el.strip() for el in vprop.split("::")]
+                for vprop in vprops
+            ]
+            for vprop in _vprops:
+                assert len(vprop) == 3, f"Invalid variant property: {vprop}"
+
+            data["properties"] = [" :: ".join(vprop) for vprop in sorted(_vprops)]
+
+        # Convert providers to VariantProviderConfig instances
+        data["providers"] = {
+            provider: VariantProviderConfig.from_dict(provider_data)
+            for provider, provider_data in data.get("providers", {}).items()
+        }
+
+        # Create an instance of VariantConfig
+        return cls(**data)
+
+    def validate(self):
+        """Validates the VariantConfig instance."""
+        for namespace in self.default_priorities.get("namespace", []):
+            if namespace not in self.providers:
+                raise ValueError(
+                    f"Namespace '{namespace}' is not defined in the variant providers"
+                )
+
+        for provider_cfg in self.providers.values():
+            provider_cfg.validate()
+
+    def to_variant_cfg_dict(self) -> dict[str, Any]:
+        """Converts the VariantConfig instance to a metadata dictionary."""
+        return {
+            "variant_label": self.vlabel,
+            "variant_properties": self.properties,
+            "variant_plugins": {
+                namespace: {
+                    "enable_if": provider_cfg.enable_if,
+                    "optional": provider_cfg.optional,
+                    "plugin_api": provider_cfg.plugin_api,
+                    "install_time": provider_cfg.install_time,
+                    "requires": provider_cfg.requires,
+                }
+                for namespace, provider_cfg in self.providers.items()
+            },
+            "variant_default_priorities": {
+                "namespace": self.default_priorities.get("namespace", []),
+                "feature": self.default_priorities.get("feature", {}),
+                "property": self.default_priorities.get("property", {})
+            },
+            "variant_static_properties": self.static_properties
+        }
+
+        
+
 
 readme_ext_to_content_type = {
     '.rst': 'text/x-rst',
